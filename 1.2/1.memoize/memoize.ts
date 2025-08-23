@@ -1,3 +1,4 @@
+// memoize with trie cache and a reduce to traverse it 
 // Unique sentinel for storing the computed result at the leaf node
 const RESULT = Symbol("memoize-result");
 
@@ -9,7 +10,7 @@ export interface Memoized<Args extends readonly unknown[], R> {
   clear(): void;
 }
 
-export function memoize<Args extends readonly unknown[], R>(
+export function memoizeTrieReduce<Args extends readonly unknown[], R>(
   f: (...args: Args) => R
 ): Memoized<Args, R> {
   let root: Node = new Map();
