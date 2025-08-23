@@ -1,4 +1,21 @@
+// simple memoize that takes in a pure function with arguments of primitive types
+type Primitive = string | number | boolean | bigint | symbol | null | undefined
+
+function memoize<Args extends readonly Primitive[], R>(
+  f: (...args: Args) => R
+): (...args: Args) => R {
+  const cache = new Map<string, R>();
+  return (...args: Args): R => {
+    const key = JSON.stringify(args);
+    if (cache.has(key)) return cache.get(key)!;
+    const r = f(...args);
+    cache.set(key, r);
+    return r;
+  };
+}
+
 // memoize with trie cache and a reduce to traverse it 
+
 // Unique sentinel for storing the computed result at the leaf node
 const RESULT = Symbol("memoize-result");
 
