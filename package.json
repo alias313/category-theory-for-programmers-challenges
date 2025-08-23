@@ -1,0 +1,19 @@
+{
+  "name": "category-theory-for-programmers-challenges",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "type": "module",
+  "scripts": {
+     "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:run": "vitest run"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@10.14.0",
+  "devDependencies": {
+    "vitest": "3.2.4"
+  }
+}
