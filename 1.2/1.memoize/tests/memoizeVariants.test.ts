@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { memoize, memoizeTrie, memoizeTrieReduce } from "../memoize";
+import { memoize, memoizeTrie, memoizeTrieReduce, memoizeTieredKnownArity } from "../memoize";
 
 const isPrime = (n: number): boolean => {
   if (n < 2) return false;
@@ -15,10 +15,15 @@ type MemoizeLike<Args extends readonly unknown[], R> = (
   f: (...args: Args) => R
 ) => (...args: Args) => R;
 
+// Adapter to fit memoizeTieredKnownArity into MemoizeLike for unary functions
+const tieredKnownArityImpl: MemoizeLike<[number], boolean> = (f) =>
+  memoizeTieredKnownArity<[number], boolean>()(f, 1);
+
 const implementations: Array<[string, MemoizeLike<[number], boolean>]> = [
   ["memoize", memoize],
   ["memoizeTrie", memoizeTrie],
   ["memoizeTrieReduce", memoizeTrieReduce],
+  ["memoizeTieredKnownArity", tieredKnownArityImpl],
 ];
 
 describe.each(implementations)("%s timing behavior", (name, memoizeImpl) => {

@@ -1,7 +1,5 @@
 // simple memoize that takes in a pure function with arguments of primitive types
-type Primitive = string | number | boolean | bigint | symbol | null | undefined
-
-export function memoize<Args extends readonly Primitive[], R>(
+export function memoize<Args extends readonly unknown[], R>(
   f: (...args: Args) => R
 ): (...args: Args) => R {
   const cache = new Map<string, R>();
@@ -79,4 +77,44 @@ export function memoizeTrieReduce<Args extends readonly unknown[], R>(
     leaf.set(RESULT, r);
     return r;
   });
+}
+
+
+// Known-arity tiered memoizer using memoize at every tier
+export function memoizeTieredKnownArity<A extends readonly unknown[], R>() {
+  function createApplier(
+    calculator: (...args: A) => R,
+    argCount: number,
+    collected: unknown[]
+  ): (next: unknown) => any {
+    const idx = collected.length;
+    const isFinal = idx >= argCount - 1;
+
+    if (isFinal) {
+      const applyFinal = (value: unknown) => {
+        // Make a readonly tuple
+        const next = [...collected, value] as unknown as A;
+        return calculator(...next);
+      };
+      return memoize(applyFinal as any);
+    } else {
+      const applyNonFinal = (value: unknown) =>
+        createApplier(calculator, argCount, [...collected, value]);
+      return memoize(applyNonFinal as any);
+    }
+  }
+
+  return function tieredMemoize(
+    calculator: (...args: A) => R,
+    expectedArgCount: number
+  ): (...args: A) => R {
+    const firstApplier = createApplier(calculator, expectedArgCount, []);
+    return (...args: A): R => {
+      const result = args.reduce<any>(
+        (applier, arg) => applier(arg),
+        firstApplier
+      );
+      return result as R;
+    };
+  };
 }
