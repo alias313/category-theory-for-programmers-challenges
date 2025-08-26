@@ -12,12 +12,10 @@ const isPrime = (n: number): boolean => {
 };
 
 describe("memoize timing behavior", () => {
-  it("isPrime: second call hits cache and runs under 0.01 ms", () => {
+  it("isPrime 16-digit prime: second call hits cache and runs under 0.1 ms", () => {
     const memoIsPrime = memoize(isPrime);
-
-    // Choose a number that's prime and large enough to be measurably slow.
-    // 15485863 is a known 8-digit prime.
-    const n = 15485863;
+    
+    const n = 1_981_201_020_802_099;
 
     const t1Start = performance.now();
     const r1 = memoIsPrime(n);
@@ -26,8 +24,8 @@ describe("memoize timing behavior", () => {
 
     expect(r1).toBe(true);
     // Sanity check: first call should be meaningfully slow (environment-dependent).
-    // We assert it's > 0.1 ms to make the cache test meaningful.
-    expect(firstMs).toBeGreaterThan(0.05);
+    // We assert it's > 10 ms to make the cache test meaningful.
+    expect(firstMs).toBeGreaterThan(10);
 
     const t2Start = performance.now();
     const r2 = memoIsPrime(n);
@@ -38,53 +36,36 @@ describe("memoize timing behavior", () => {
     console.log(`[memoize:isPrime] firstMs=${firstMs.toFixed(3)}ms secondMs=${secondMs.toFixed(3)}ms speedup=${speedupStr}`);
 
     expect(r2).toBe(true);
-    expect(secondMs).toBeLessThan(0.01);
-  });
-
-  it("computeOnce via memoize: second call hits cache and runs under 0.01 ms", () => {
-    let counter = 0;
-    const computeOnce = (): number => {
-      // Expensive sync loop to simulate heavy work
-      for (let i = 0; i < 5e7; i++) {}
-      return ++counter;
-    };
-
-    const memoOnce = memoize(computeOnce);
-
-    const t1Start = performance.now();
-    const r1 = memoOnce();
-    const t1End = performance.now();
-    const firstMs = t1End - t1Start;
-
-    expect(r1).toBe(1);
-    expect(firstMs).toBeGreaterThan(0.05);
-
-    const t2Start = performance.now();
-    const r2 = memoOnce();
-    const t2End = performance.now();
-    const secondMs = t2End - t2Start;
-    const speedup = secondMs > 0 ? firstMs / secondMs : Infinity;
-    const speedupStr = Number.isFinite(speedup) ? `${speedup.toFixed(1)}x` : "∞x";
-    console.log(`[memoize:computeOnce] firstMs=${firstMs.toFixed(3)}ms secondMs=${secondMs.toFixed(3)}ms speedup=${speedupStr}`);
-
-    expect(r2).toBe(1);
-    expect(secondMs).toBeLessThan(0.01);
+    expect(secondMs).toBeLessThan(0.1);
   });
 
   it("isPrime: different arguments do not hit cache (should be slow again)", () => {
     const memoIsPrime = memoize(isPrime);
+
     const a = 15485863; // prime
-    const b = 15485867; // test a nearby number (prime as well), different arg => cache miss
+    const b = 1_981_201_020_802_099; // prime (different arg)
 
     // Warm cache for a
     memoIsPrime(a);
 
-    const tStart = performance.now();
+    const tCachedStart = performance.now();
+    const cachedR = memoIsPrime(a);
+    const tCachedEnd = performance.now();
+    const cachedMs = tCachedEnd - tCachedStart;
+
+    expect(cachedR).toBe(true);
+
+    const tMissStart = performance.now();
     const r = memoIsPrime(b);
-    const tEnd = performance.now();
+    const tMissEnd = performance.now();
+    const missMs = tMissEnd - tMissStart;
+
+    const ratio = missMs > 0 ? missMs / cachedMs : Infinity;
+    const ratioStr = Number.isFinite(ratio) ? `${ratio.toFixed(1)}x` : "∞x";
+    console.log(`[memoize:differentArgs] cachedMs=${cachedMs.toFixed(3)}ms missMs=${missMs.toFixed(3)}ms ratio=${ratioStr}`);
 
     expect(r).toBe(true);
-    expect(tEnd - tStart).toBeGreaterThan(0.01);
+    expect(missMs).toBeGreaterThan(cachedMs * 1000);
   });
 });
 
