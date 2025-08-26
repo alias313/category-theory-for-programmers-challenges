@@ -22,14 +22,9 @@ const RESULT = Symbol("memoize-result");
 // Internal cache node type (a plain Map used to build the trie)
 type Node = Map<unknown, unknown>;
 
-export interface Memoized<Args extends readonly unknown[], R> {
-  (...args: Args): R;
-  clear(): void;
-}
-
 export function memoizeTrieReduce<Args extends readonly unknown[], R>(
   f: (...args: Args) => R
-): Memoized<Args, R> {
+): (...args: Args) => R {
   let root: Node = new Map();
 
   // Local helper: get the child node for a key, creating it if absent
@@ -41,7 +36,7 @@ export function memoizeTrieReduce<Args extends readonly unknown[], R>(
     return created;
   };
 
-  const memo = ((...args: Args): R => {
+  return ((...args: Args): R => {
     // Walk the trie along the argument tuple to reach the leaf node
     const leaf: Node = args.reduce<Node>(getOrInit, root);
 
@@ -54,11 +49,5 @@ export function memoizeTrieReduce<Args extends readonly unknown[], R>(
     const r = f(...args);
     leaf.set(RESULT, r);
     return r;
-  }) as Memoized<Args, R>;
-
-  memo.clear = () => {
-    root = new Map();
-  };
-
-  return memo;
+  });
 }
