@@ -79,6 +79,41 @@ export function memoizeTrieReduce<Args extends readonly unknown[], R>(
   });
 }
 
+// Tiered memoize using stores (Maps) only.
+// Same signature as memoizeTrie; stores the leaf result in the node.
+type RecordNode<R> = {
+  children: Map<unknown, RecordNode<R>>;
+  hasResult: boolean;
+  result?: R;
+};
+
+export function memoizeTrieRecord<Args extends readonly unknown[], R>(
+  f: (...args: Args) => R
+): (...args: Args) => R {
+  const root: RecordNode<R> = { children: new Map(), hasResult: false };
+
+  return (...args: Args): R => {
+    // Walk or build down the trie
+    let node = root;
+    for (const key of args) {
+      let next = node.children.get(key);
+      if (!next) {
+        next = { children: new Map(), hasResult: false };
+        node.children.set(key, next);
+      }
+      node = next;
+    }
+
+    // At the leaf, return cached result or compute and store
+    if (node.hasResult) {
+      return node.result as R;
+    }
+    const r = f(...args);
+    node.result = r;
+    node.hasResult = true;
+    return r;
+  };
+}
 
 // Known-arity tiered memoizer using memoize at every tier
 export function memoizeTieredKnownArity<A extends readonly unknown[], R>() {
