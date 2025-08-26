@@ -118,3 +118,43 @@ export function memoizeTieredKnownArity<A extends readonly unknown[], R>() {
     };
   };
 }
+
+// Tiered memoize where arity is not known until call time.
+// Uses the top-level memoize at each tier; same signature as memoizeTrie.
+export function memoizeTieredUnknownArity<
+  Args extends readonly unknown[],
+  R
+>(f: (...args: Args) => R): (...args: Args) => R {
+  // Build a memoized chain of unary appliers.
+  function createApplier(collected: unknown[]) {
+    // Memoize "apply next arg" at this tier
+    const applyNext = memoize((arg: unknown) =>
+      createApplier([...collected, arg])
+    );
+
+    // Lazily compute and cache the result for this exact collected prefix
+    let computed = false;
+    let value!: R;
+    const compute = () => {
+      if (!computed) {
+        computed = true;
+        value = f(...([...collected] as unknown as Args));
+      }
+      return value;
+    };
+
+    // If called with an arg, return next applier; if called with no args, finalize
+    return (...maybeArg: [unknown] | []): any => {
+      if (maybeArg.length === 0) return compute();
+      return applyNext(maybeArg[0]);
+    };
+  }
+
+  const initApplier = createApplier([]);
+
+  return (...args: Args): R => {
+    // Feed args through the chain, then finalize with a 0-arg call
+    const last = args.reduce<any>((applier, arg) => applier(arg), initApplier);
+    return last() as R;
+  };
+}

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { memoize, memoizeTrie, memoizeTrieReduce, memoizeTieredKnownArity } from "../memoize";
+import { memoize, memoizeTrie, memoizeTrieReduce, memoizeTieredKnownArity, memoizeTieredUnknownArity } from "../memoize";
 
 const isPrime = (n: number): boolean => {
   if (n < 2) return false;
@@ -24,6 +24,7 @@ const implementations: Array<[string, MemoizeLike<[number], boolean>]> = [
   ["memoizeTrie", memoizeTrie],
   ["memoizeTrieReduce", memoizeTrieReduce],
   ["memoizeTieredKnownArity", tieredKnownArityImpl],
+  ["memoizeTieredUnknownArity", memoizeTieredUnknownArity],
 ];
 
 describe.each(implementations)("%s timing behavior", (name, memoizeImpl) => {
