@@ -73,4 +73,8 @@ Why this matters for memoize:
 	- That would degrade the type safety of the returned function.
 In short: tuples preserve the function’s parameter list precisely; arrays don’t.
 
-
+Between stringify and nested maps:
+- Both are O(k).
+- Differences come from constants:
+	- Stringify: 1 Map op + serialization + string allocation.
+	- Nested: k Map ops, usually zero allocations on cache hits.
