@@ -1,5 +1,7 @@
 import { describe, it, expect } from "vitest";
 
+import { memoize } from "../memoize";
+
 const isPrime = (n: number): boolean => {
   if (n < 2) return false;
   const limit = Math.floor(Math.sqrt(n));
@@ -8,22 +10,6 @@ const isPrime = (n: number): boolean => {
   }
   return true;
 };
-
-export function memoize<Args extends readonly unknown[], R>(
-  f: (...args: Args) => R
-): (...args: Args) => R {
-  const cache = new Map<string, R>();
-
-  return (...args: Args): R => {
-    const key = JSON.stringify(args); // fine for primitives/tuples of primitives
-    if (cache.has(key)) {
-      return cache.get(key)!;
-    }
-    const result = f(...args);
-    cache.set(key, result);
-    return result;
-  };
-}
 
 describe("memoize timing behavior", () => {
   it("isPrime: second call hits cache and runs under 0.01 ms", () => {

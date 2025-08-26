@@ -1,7 +1,7 @@
 // simple memoize that takes in a pure function with arguments of primitive types
 type Primitive = string | number | boolean | bigint | symbol | null | undefined
 
-function memoize<Args extends readonly Primitive[], R>(
+export function memoize<Args extends readonly Primitive[], R>(
   f: (...args: Args) => R
 ): (...args: Args) => R {
   const cache = new Map<string, R>();

@@ -1,9 +1,6 @@
-// memoize.timing.test.ts
 import { describe, it, expect } from "vitest";
 
-// Paste or import your implementations as needed
-// import { memoize } from "./memoize";
-// import { isPrime } from "./isPrime";
+import { memoizeTrieReduce } from "../memoize";
 
 const isPrime = (n: number): boolean => {
   if (n < 2) return false;
@@ -14,47 +11,10 @@ const isPrime = (n: number): boolean => {
   return true;
 };
 
-// Nested-Map memoize
-const RESULT = Symbol("memoize-result");
-type Node = Map<unknown, unknown>;
-
-export interface Memoized<Args extends readonly unknown[], R> {
-  (...args: Args): R;
-  clear(): void;
-}
-
-export function memoize<Args extends readonly unknown[], R>(
-  f: (...args: Args) => R
-): Memoized<Args, R> {
-  let root: Node = new Map();
-  const getOrInit = (node: Node, key: unknown): Node => {
-    const existing = node.get(key) as Node | undefined;
-    if (existing !== undefined) return existing;
-    const created: Node = new Map();
-    node.set(key, created);
-    return created;
-  };
-
-  const memo = ((...args: Args): R => {
-    const leaf: Node = args.reduce<Node>(getOrInit, root);
-    if (leaf.has(RESULT)) {
-      return leaf.get(RESULT) as R;
-    }
-    const r = f(...args);
-    leaf.set(RESULT, r);
-    return r;
-  }) as Memoized<Args, R>;
-
-  memo.clear = () => {
-    root = new Map();
-  };
-
-  return memo;
-}
 
 describe("memoize timing behavior", () => {
   it("isPrime: second call hits cache and runs under 0.01 ms", () => {
-    const memoIsPrime = memoize(isPrime);
+    const memoIsPrime = memoizeTrieReduce(isPrime);
 
     // Choose a number that's prime and large enough to be measurably slow.
     // 15485863 is a known 8-digit prime.
@@ -87,7 +47,7 @@ describe("memoize timing behavior", () => {
       return ++counter;
     };
 
-    const memoOnce = memoize(computeOnce);
+    const memoOnce = memoizeTrieReduce(computeOnce);
 
     const t1Start = performance.now();
     const r1 = memoOnce();
@@ -107,7 +67,7 @@ describe("memoize timing behavior", () => {
   });
 
   it("isPrime: different arguments do not hit cache (should be slow again)", () => {
-    const memoIsPrime = memoize(isPrime);
+    const memoIsPrime = memoizeTrieReduce(isPrime);
     const a = 15485863; // prime
     const b = 15485867; // test a nearby number (prime as well), different arg => cache miss
 
