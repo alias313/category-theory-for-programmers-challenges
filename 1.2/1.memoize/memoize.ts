@@ -14,13 +14,42 @@ export function memoize<Args extends readonly Primitive[], R>(
   };
 }
 
+// memoize with nested map (trie) cache
+// Internal cache node type (a plain Map used to build the trie)
+type Node = Map<unknown, unknown>;
+
+export function memoizeTrie<Args extends readonly unknown[], R>(
+  f: (...args: Args) => R
+): (...args: Args) => R {
+  const root: Node = new Map();
+
+  return (...args: Args): R => {
+    let node: Node = root;
+
+    for (let i = 0; i < args.length - 1; i++) {
+      const a = args[i];
+      let next = node.get(a) as Node | undefined;
+      if (!next) {
+        next = new Map();
+        node.set(a, next);
+      }
+      node = next;
+    }
+
+    const last = args[args.length - 1];
+    if (node.has(last)) {
+      return node.get(last) as R;
+    }
+    const r = f(...args);
+    node.set(last, r);
+    return r;
+  };
+}
+
 // memoize with trie cache and a reduce to traverse it 
 
 // Unique sentinel for storing the computed result at the leaf node
 const RESULT = Symbol("memoize-result");
-
-// Internal cache node type (a plain Map used to build the trie)
-type Node = Map<unknown, unknown>;
 
 export function memoizeTrieReduce<Args extends readonly unknown[], R>(
   f: (...args: Args) => R
