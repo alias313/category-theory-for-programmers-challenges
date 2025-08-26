@@ -33,6 +33,9 @@ describe("memoize timing behavior", () => {
     const r2 = memoIsPrime(n);
     const t2End = performance.now();
     const secondMs = t2End - t2Start;
+    const speedup = secondMs > 0 ? firstMs / secondMs : Infinity;
+    const speedupStr = Number.isFinite(speedup) ? `${speedup.toFixed(1)}x` : "∞x";
+    console.log(`[memoize:isPrime] firstMs=${firstMs.toFixed(3)}ms secondMs=${secondMs.toFixed(3)}ms speedup=${speedupStr}`);
 
     expect(r2).toBe(true);
     expect(secondMs).toBeLessThan(0.01);
@@ -60,6 +63,9 @@ describe("memoize timing behavior", () => {
     const r2 = memoOnce();
     const t2End = performance.now();
     const secondMs = t2End - t2Start;
+    const speedup = secondMs > 0 ? firstMs / secondMs : Infinity;
+    const speedupStr = Number.isFinite(speedup) ? `${speedup.toFixed(1)}x` : "∞x";
+    console.log(`[memoize:computeOnce] firstMs=${firstMs.toFixed(3)}ms secondMs=${secondMs.toFixed(3)}ms speedup=${speedupStr}`);
 
     expect(r2).toBe(1);
     expect(secondMs).toBeLessThan(0.01);
