@@ -8,7 +8,7 @@ import {
   memoizeTrieRecord,
   memoizeTieredKnownArity,
   memoizeTieredUnknownArity,
-} from "../memoize";
+} from "../memoize.js";
 
 type MemoizeLike<Args extends readonly unknown[], R> = (
   f: (...args: Args) => R
@@ -26,6 +26,9 @@ const singleFirstArgBaseline: MemoizeLike<readonly number[], number> = (f) => {
   });
   return (...args: readonly number[]) => {
     const [first, ...rest] = args as number[];
+    if (first === undefined) {
+      return f();
+    }
     const cont = memo(first);
     return cont(...rest);
   };

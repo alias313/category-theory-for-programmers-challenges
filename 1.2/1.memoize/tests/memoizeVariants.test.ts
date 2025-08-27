@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 
-import { memoizeSingle, memoizeSerialize, memoizeTrie, memoizeTrieReduce, memoizeTieredKnownArity, memoizeTieredUnknownArity, memoizeTrieRecord } from "../memoize";
+import { memoizeSingle, memoizeSerialize, memoizeTrie, memoizeTrieReduce, memoizeTieredKnownArity, memoizeTieredUnknownArity, memoizeTrieRecord } from "../memoize.js";
 
 const isPrime = (...ns: number[]): boolean => {
   const single = (n: number): boolean => {
