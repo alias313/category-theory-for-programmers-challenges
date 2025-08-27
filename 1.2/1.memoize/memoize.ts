@@ -1,5 +1,20 @@
-// simple memoize that takes in a pure function with arguments of primitive types
-export function memoize<Args extends readonly unknown[], R>(
+// Unary memoize: caches by argument identity (works for primitives and objects)
+export function memoizeSingle<A, R>(f: (arg: A) => R): (arg: A) => R {
+  const cache = new Map<A, R>();
+  return (arg: A): R => {
+    if (cache.has(arg)) return cache.get(arg)!;
+    const r = f(arg);
+    cache.set(arg, r);
+    return r;
+  };
+}
+
+// simple memoize that uses serialize to create a key
+// if it accepted objects, some keys like "toString" would be problematic
+type Primitive = string | number | boolean | bigint | symbol | null | undefined
+
+
+export function memoizeSerialize<Args extends readonly Primitive[], R>(
   f: (...args: Args) => R
 ): (...args: Args) => R {
   const cache = new Map<string, R>();
@@ -131,15 +146,15 @@ export function memoizeTieredKnownArity<A extends readonly unknown[], R>() {
         const next = [...collected, value] as unknown as A;
         return calculator(...next);
       };
-      return memoize(applyFinal as any);
+      return memoizeSingle(applyFinal as any);
     } else {
       const applyNonFinal = (value: unknown) =>
         createApplier(calculator, argCount, [...collected, value]);
-      return memoize(applyNonFinal as any);
+      return memoizeSingle(applyNonFinal as any);
     }
   }
 
-  return function tieredMemoize(
+  return function tieredmemoizeSingle(
     calculator: (...args: A) => R,
     expectedArgCount: number
   ): (...args: A) => R {
@@ -163,7 +178,7 @@ export function memoizeTieredUnknownArity<
   // Build a memoized chain of unary appliers.
   function createApplier(collected: unknown[]) {
     // Memoize "apply next arg" at this tier
-    const applyNext = memoize((arg: unknown) =>
+    const applyNext = memoizeSingle((arg: unknown) =>
       createApplier([...collected, arg])
     );
 
