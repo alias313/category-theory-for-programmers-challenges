@@ -64,14 +64,14 @@ export function makeMemoizeTrie<Args extends readonly any[], R, E, Req>(
         return SynchronizedRef.modifyEffect(cacheRef, (root) => {
           if (root.has(ZEROTH_ARG)) {
             const result = root.get(ZEROTH_ARG) as R;
-            return [Effect.succeed(result), (_res: R) => root];
+            return Effect.succeed([result, root] as const);
           }
-          const compute = f(...args);
-          const update = (result: R) => {
-            root.set(ZEROTH_ARG, result);
-            return root;
-          };
-          return [compute, update];
+          return f(...args).pipe(
+            Effect.map((result) => {
+              root.set(ZEROTH_ARG, result);
+              return [result, root] as const;
+            })
+          );
         });
       }
 
@@ -94,34 +94,31 @@ export function makeMemoizeTrie<Args extends readonly any[], R, E, Req>(
         // 2. Handle a cache hit.
         if (pathExists && node.has(lastArg)) {
           const cachedResult = node.get(lastArg) as R;
-          // The effect to run is one that immediately succeeds with the cached value.
-          // The update function is a no-op because the cache is already correct.
-          return [Effect.succeed(cachedResult), (_result: R) => root];
+          // Return the cached value and unchanged root as an Effect of tuple
+          return Effect.succeed([cachedResult, root] as const);
         }
 
         // 3. Handle a cache miss.
         // The effect to run is the original function `f`.
         const computeEffect = f(...args);
-
-        // The update function will receive the result of `computeEffect`.
-        const updateFunction = (result: R) => {
-          // Re-traverse the trie, this time creating nodes where they don't exist.
-          let nodeToUpdate: Node = root;
-          for (let i = 0; i < args.length - 1; i++) {
-            const arg = args[i];
-            let next = nodeToUpdate.get(arg) as Node | undefined;
-            if (!next) {
-              next = new Map();
-              nodeToUpdate.set(arg, next);
+        return computeEffect.pipe(
+          Effect.map((result) => {
+            // Re-traverse the trie, this time creating nodes where they don't exist.
+            let nodeToUpdate: Node = root;
+            for (let i = 0; i < args.length - 1; i++) {
+              const arg = args[i];
+              let next = nodeToUpdate.get(arg) as Node | undefined;
+              if (!next) {
+                next = new Map();
+                nodeToUpdate.set(arg, next);
+              }
+              nodeToUpdate = next;
             }
-            nodeToUpdate = next;
-          }
-          // Set the computed result at the final leaf node.
-          nodeToUpdate.set(lastArg, result);
-          return root; // Return the modified root to be set as the new state.
-        };
-
-        return [computeEffect, updateFunction];
+            // Set the computed result at the final leaf node.
+            nodeToUpdate.set(lastArg, result);
+            return [result, root] as const; // Return result and updated root
+          })
+        );
       });
     };
   });
