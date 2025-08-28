@@ -90,16 +90,18 @@ export function makeMemoizeTiered<Args extends readonly unknown[], R, E, Req>(
 
     const rootApplier = yield* createApplier([]);
 
-    const memoized = (
+    const memoized = Effect.fn("makeMemoizeTiered")(function* (
       ...args: Args
-    ): Effect.Effect<R, E, Req> =>
-      Effect.gen(function* () {
-        let applier = rootApplier;
-        for (const arg of args) {
-          applier = yield* applier(arg);
-        }
-        return yield* applier();
-      });
+    ) {
+      // Capture simple argument metadata for the span
+      yield* Effect.annotateCurrentSpan("function.args", args);
+
+      let applier = rootApplier;
+      for (const arg of args) {
+        applier = yield* applier(arg);
+      }
+      return yield* applier();
+    });
 
     return memoized;
   });
@@ -142,6 +144,8 @@ export function makeMemoizeTrie<Args extends readonly any[], R, E, Req>(
     // Effect.fn creates the final function for us. The generator body
     // is the implementation of our memoized function.
     return Effect.fn("makememoizeTrie")(function* (...args: Args) {
+
+      yield* Effect.annotateCurrentSpan("function.args", args);
 
       // We use `modifyEffect` for an atomic "get or compute" operation.
       return yield* SynchronizedRef.modifyEffect(cacheRef, (root) => {
