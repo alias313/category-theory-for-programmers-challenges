@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Effect } from "effect";
 
-import { makeMemoizeSingle, makeMemoizeTrie } from "../memoizeEffect.js";
+import { makeMemoizeTiered, makeMemoizeTrie } from "../memoizeEffect.js";
 
 const isPrime = (n: number): boolean => {
   if (n < 2) return false;
@@ -36,7 +36,7 @@ const implementations: Array<[
   EffectMemoizeLike<readonly number[], boolean>
 ]> = [
   ["makeMemoizeTrie", trieAdapter],
-  ["makeMemoizeTiered", trieAdapter],
+  ["makeMemoizeTiered", makeMemoizeTiered],
 ];
 
 describe.each(implementations)("%s timing behavior (multi-arg)", (name, makeMemoizeImpl) => {
