@@ -32,7 +32,7 @@ const makeTracingLayer = () => {
 
 const run = <A, E>(effect: Effect.Effect<A, E, never>) =>
   process.env.RUN_TRACE
-    ? Effect.runPromise(effect.pipe(Effect.provide(makeTracingLayer())))
+    ? Effect.runPromise(Effect.scoped(effect.pipe(Effect.provide(makeTracingLayer()))))
     : Effect.runPromise(effect);
 
 function repeatEffect(
@@ -80,7 +80,7 @@ describe("Effect memoization overheads: hits vs misses and arity scaling", () =>
           const usPerOp = (totalMs * 1000) / HIT_ITERS;
           console.log(`${name} hit k=${k}: total=${totalMs.toFixed(2)}ms (~${usPerOp.toFixed(2)} µs/op)`);
           expect(Number.isFinite(totalMs)).toBe(true);
-        });
+        }, 20000);
 
         it(`${name}: cache build (miss)`, async () => {
           const memo = await run(
@@ -102,7 +102,7 @@ describe("Effect memoization overheads: hits vs misses and arity scaling", () =>
           const usPerOp = (totalMs * 1000) / MISS_ITERS;
           console.log(`${name} build k=${k}: total=${totalMs.toFixed(2)}ms (~${usPerOp.toFixed(2)} µs/op)`);
           expect(Number.isFinite(totalMs)).toBe(true);
-        });
+        }, 20000);
       }
     });
   }

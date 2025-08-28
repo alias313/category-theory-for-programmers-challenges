@@ -8,15 +8,17 @@
     "test": "vitest",
     "test:watch": "vitest --watch",
     "test:run": "vitest run",
-    "trace:memoize:console": "RUN_TRACE=1 vitest run 1.2/1.memoize/tests/traceMemoizeEffectVariants.test.ts 1.2/1.memoize/tests/traceBenchEffectOverheads.test.ts",
-    "trace:memoize:otlp": "RUN_TRACE=1 TRACING_MODE=otlp vitest run 1.2/1.memoize/tests/traceMemoizeEffectVariants.test.ts 1.2/1.memoize/tests/traceBenchEffectOverheads.test.ts",
-    "trace:memoize:axiom": "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://api.axiom.co/v1/traces OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf OTEL_EXPORTER_OTLP_TRACES_COMPRESSION=gzip OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer ${AXIOM_TOKEN},X-Axiom-Dataset=memoize\" RUN_TRACE=1 TRACING_MODE=otlp vitest run 1.2/1.memoize/tests/traceMemoizeEffectVariants.test.ts 1.2/1.memoize/tests/traceBenchEffectOverheads.test.ts"
+    "trace:memoize:console": "dotenv -e .env -- sh -c \"RUN_TRACE=1 vitest run 1.2/1.memoize/tests/traceMemoizeEffectVariants.test.ts 1.2/1.memoize/tests/traceBenchEffectOverheads.test.ts\"",
+    "trace:memoize:otlp": "dotenv -e .env -- sh -c \"RUN_TRACE=1 TRACING_MODE=otlp vitest run 1.2/1.memoize/tests/traceMemoizeEffectVariants.test.ts 1.2/1.memoize/tests/traceBenchEffectOverheads.test.ts\"",
+    "trace:memoize:axiom:base": "OTEL_EXPORTER_OTLP_TRACES_ENDPOINT=https://api.axiom.co/v1/traces OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf OTEL_EXPORTER_OTLP_TRACES_COMPRESSION=gzip OTEL_EXPORTER_OTLP_HEADERS=\"Authorization=Bearer ${AXIOM_TOKEN},X-Axiom-Dataset=${AXIOM_DATASET}\" RUN_TRACE=1 TRACING_MODE=otlp vitest run 1.2/1.memoize/tests/traceMemoizeEffectVariants.test.ts 1.2/1.memoize/tests/traceBenchEffectOverheads.test.ts",
+    "trace:memoize:axiom": "dotenv -e .env -- pnpm run -s trace:memoize:axiom:base"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.14.0",
   "devDependencies": {
+    "dotenv-cli": "7.4.1",
     "tsx": "4.20.5",
     "typescript": "5.9.2",
     "vitest": "3.2.4"
