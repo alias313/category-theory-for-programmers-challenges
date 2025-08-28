@@ -1,6 +1,8 @@
 # Category Theory for Programmers challenges
 My solutions for challenges posed in the book.
 
+Credit to the idea of tiered memoizers to [this article](https://medium.com/@joedski/memoization-of-multi-parametered-functions-in-javascript-8508e89ba545)
+
 ## Tracing and benchmarks
 
 You can run the tracing tests to emit spans either to the console or to an OTLP endpoint.
