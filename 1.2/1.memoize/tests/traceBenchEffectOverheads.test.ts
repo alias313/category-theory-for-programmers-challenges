@@ -30,6 +30,7 @@ const makeTracingLayer = () => {
   }));
 };
 
+
 const run = <A, E>(effect: Effect.Effect<A, E, never>) =>
   process.env.RUN_TRACE
     ? Effect.runPromise(Effect.scoped(effect.pipe(Effect.provide(makeTracingLayer()))))
@@ -46,6 +47,15 @@ function repeatEffect(
   });
 }
 
+const cachedAdapter: EffectMemoizeLike<readonly number[], number> = (f) =>
+  Effect.cachedFunction<readonly number[], number, never, never>((args) => f(...args)).pipe(
+    Effect.map((memoUnary) =>
+      Effect.fn("cachedFunction")(function* (...args: readonly number[]) {
+        return yield* memoUnary(args);
+      })
+    )
+  );
+
 describe("Effect memoization overheads: hits vs misses and arity scaling", () => {
   // Keep counts smaller than sync version due to async runtime
   const ARITIES = [1, 3, 6] as const;
@@ -56,7 +66,7 @@ describe("Effect memoization overheads: hits vs misses and arity scaling", () =>
     string,
     EffectMemoizeLike<readonly number[], number>
   ]> = [
-    ["cachedFunction", Effect.fn("cachedFunction")(Effect.cachedFunction)],
+    ["cachedAdapter", cachedAdapter],
     ["makeMemoizeTrie", makeMemoizeTrie],
     ["makeMemoizeTiered", makeMemoizeTiered],
   ];
