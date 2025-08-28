@@ -7,18 +7,27 @@
   "scripts": {
     "test": "vitest",
     "test:watch": "vitest --watch",
-    "test:run": "vitest run"
+    "test:run": "vitest run",
+    "trace:memoize:console": "RUN_TRACE=1 vitest run 1.2/1.memoize/tests/traceMemoizeEffectVariants.test.ts",
+    "trace:memoize:otlp": "RUN_TRACE=1 TRACING_MODE=otlp vitest run 1.2/1.memoize/tests/traceMemoizeEffectVariants.test.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "packageManager": "pnpm@10.14.0",
   "devDependencies": {
+    "tsx": "4.20.5",
     "typescript": "5.9.2",
     "vitest": "3.2.4"
   },
   "dependencies": {
     "@effect/opentelemetry": "0.56.4",
+    "@opentelemetry/api": "1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "0.203.0",
+    "@opentelemetry/sdk-metrics": "2.0.1",
+    "@opentelemetry/sdk-trace-base": "2.0.1",
+    "@opentelemetry/sdk-trace-node": "2.0.1",
+    "@opentelemetry/sdk-trace-web": "2.0.1",
     "effect": "3.17.9"
   }
 }
