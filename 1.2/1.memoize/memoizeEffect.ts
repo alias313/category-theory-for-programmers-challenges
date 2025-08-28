@@ -36,90 +36,110 @@ export function makeMemoizeSingle<A, Success, Error, Requirements>(
 }
 
 
-// A type alias for clarity, representing a node in our cache trie.
-type Node = Map<unknown, unknown>;
+// A node in the cache trie that can hold both children and a result.
+// Using a container for the result allows us to distinguish
+// "has a cached result of undefined" from "has no result yet".
+type TrieNode<R> = {
+  readonly children: Map<unknown, TrieNode<R>>;
+  result: { value: R } | undefined;
+};
+
+// Helper to create a new, empty node.
+const makeNode = <R>(): TrieNode<R> => ({
+  children: new Map(),
+  result: undefined,
+});
 
 /**
- * Creates an Effect that, when executed, produces a memoized version of an
- * effectful function `f`. The cache uses a trie (nested map) structure,
- * making it suitable for functions with multiple arguments.
+ * Creates an Effect that, when executed, produces a memoized and TRACED version
+ * of an effectful function `f`. The cache uses a trie structure where any node
+ * can store a result, elegantly handling functions of any arity, including zero.
  *
  * This implementation is concurrent-safe.
  *
  * @param f The effectful function to memoize. `(...args) => Effect<...>`
+ * @param functionName The name to use for the trace spans.
  * @returns An Effect that resolves to the new memoized function.
  */
 export function makeMemoizeTrie<Args extends readonly any[], R, E, Req>(
-  f: (...args: Args) => Effect.Effect<R, E, Req>
+  f: (...args: Args) => Effect.Effect<R, E, Req>,
 ): Effect.Effect<(...args: Args) => Effect.Effect<R, E, Req>, never, never> {
+  // This is the "constructor" Effect. It runs once to set up the cache
+  // and create the memoized function.
   return Effect.gen(function* () {
-    // The root of the trie, managed by a concurrent-safe Ref.
-    const cacheRef = yield* SynchronizedRef.make<Node>(new Map());
+    const cacheRef = yield* SynchronizedRef.make<TrieNode<R>>(makeNode());
 
-    // This is the memoized function that will be returned.
-    return (...args: Args): Effect.Effect<R, E, Req> => {
-      // A special case for zero arguments. We use a unique symbol as the key.
-      if (args.length === 0) {
-        const ZEROTH_ARG = Symbol.for("effect/memoizeTrie/zerothArgument");
-        return SynchronizedRef.modifyEffect(cacheRef, (root) => {
-          if (root.has(ZEROTH_ARG)) {
-            const result = root.get(ZEROTH_ARG) as R;
-            return Effect.succeed([result, root] as const);
+    // Effect.fn creates the final function for us. The generator body
+    // is the implementation of our memoized function.
+    return Effect.fn("makememoizeTrie")(function* (...args: Args) {
+      yield* Effect.annotateCurrentSpan("function.arguments", args);
+
+      // We use `modifyEffect` for an atomic "get or compute" operation.
+      return yield* SynchronizedRef.modifyEffect(cacheRef, (root) => {
+        // 1. Traverse the trie to find the target node for these args.
+        let targetNode = root;
+        for (const arg of args) {
+          const next = targetNode.children.get(arg);
+          if (next) {
+            targetNode = next;
+          } else {
+            // Path doesn't exist, so it's a guaranteed cache miss.
+            return f(...args).pipe(
+              Effect.tap(() => Effect.annotateCurrentSpan("cache.hit", false)),
+              Effect.map((result) => {
+                const newRoot = updateCache(root, args, result);
+                return [result, newRoot] as const;
+              })
+            );
           }
-          return f(...args).pipe(
-            Effect.map((result) => {
-              root.set(ZEROTH_ARG, result);
-              return [result, root] as const;
-            })
+        }
+
+        // 2. We've reached the target node. Check if it has a result.
+        if (targetNode.result) {
+          // Cache Hit!
+          const effect = Effect.succeed(targetNode.result.value).pipe(
+            Effect.tap(() => Effect.annotateCurrentSpan("cache.hit", true))
           );
-        });
-      }
-
-      // The main logic for one or more arguments.
-      return SynchronizedRef.modifyEffect(cacheRef, (root) => {
-        // 1. Synchronously traverse the trie as far as possible without mutating.
-        let node: Node = root;
-        let pathExists = true;
-        for (let i = 0; i < args.length - 1; i++) {
-          const next = node.get(args[i]) as Node | undefined;
-          if (!next) {
-            pathExists = false;
-            break;
-          }
-          node = next;
+          // Return the cached result and the UNCHANGED root.
+          return effect.pipe(Effect.map((res) => [res, root] as const));
         }
 
-        const lastArg = args[args.length - 1];
-
-        // 2. Handle a cache hit.
-        if (pathExists && node.has(lastArg)) {
-          const cachedResult = node.get(lastArg) as R;
-          // Return the cached value and unchanged root as an Effect of tuple
-          return Effect.succeed([cachedResult, root] as const);
-        }
-
-        // 3. Handle a cache miss.
-        // The effect to run is the original function `f`.
-        const computeEffect = f(...args);
-        return computeEffect.pipe(
+        // 3. Cache Miss at the target node.
+        return f(...args).pipe(
+          Effect.tap(() => Effect.annotateCurrentSpan("cache.hit", false)),
           Effect.map((result) => {
-            // Re-traverse the trie, this time creating nodes where they don't exist.
-            let nodeToUpdate: Node = root;
-            for (let i = 0; i < args.length - 1; i++) {
-              const arg = args[i];
-              let next = nodeToUpdate.get(arg) as Node | undefined;
-              if (!next) {
-                next = new Map();
-                nodeToUpdate.set(arg, next);
-              }
-              nodeToUpdate = next;
-            }
-            // Set the computed result at the final leaf node.
-            nodeToUpdate.set(lastArg, result);
-            return [result, root] as const; // Return result and updated root
+            const newRoot = updateCache(root, args, result);
+            return [result, newRoot] as const;
           })
         );
       });
-    };
+    });
   });
+}
+
+/**
+ * A pure helper function to immutably update the trie. It creates a deep
+ * copy of the path being written to, ensuring concurrent reads are not affected.
+ */
+function updateCache<R>(
+  root: TrieNode<R>,
+  args: readonly any[],
+  result: R
+): TrieNode<R> {
+  const newRoot: TrieNode<R> = { ...root, children: new Map(root.children) };
+
+  let currentNode = newRoot;
+  for (const arg of args) {
+    const existingNext = currentNode.children.get(arg);
+    const newNext: TrieNode<R> = {
+      ...makeNode<R>(),
+      ...existingNext,
+      children: new Map(existingNext?.children),
+    };
+    currentNode.children.set(arg, newNext);
+    currentNode = newNext;
+  }
+
+  currentNode.result = { value: result };
+  return newRoot;
 }
