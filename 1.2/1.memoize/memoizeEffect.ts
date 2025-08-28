@@ -77,12 +77,38 @@ export function makeMemoizeTiered<Args extends readonly unknown[], R, E, Req>(
         const memoizedNext = yield* makeMemoizeSingle((arg: unknown) =>
           createApplier([...collectedArgs, arg])
         );
-        const memoizedResult = yield* makeMemoizeSingle((_: void) =>
-          f(...(collectedArgs as unknown as Args))
-        );
+
+        // Result cache for this specific prefix of collectedArgs
+        const resultCacheRef = yield* SynchronizedRef.make<
+          | { readonly hasValue: false }
+          | { readonly hasValue: true; readonly value: R }
+        >({ hasValue: false });
 
         const applier: Applier<R, E, Req> = ((...maybeArg: [unknown] | []) => {
-          if (maybeArg.length === 0) return memoizedResult(undefined);
+          if (maybeArg.length === 0)
+            return Effect.gen(function* () {
+              const out = yield* SynchronizedRef.modifyEffect(
+                resultCacheRef,
+                (state) => {
+                  if (state.hasValue) {
+                    const out: { value: R; hit: boolean } = { value: state.value as R, hit: true };
+                    return Effect.succeed([out, state] as const);
+                  }
+                  return f(...(collectedArgs as unknown as Args)).pipe(
+                    Effect.map((value) => {
+                      const out: { value: R; hit: boolean } = { value, hit: false };
+                      const newState = { hasValue: true as const, value } as const;
+                      return [out, newState] as const;
+                    })
+                  );
+                }
+              );
+
+              // Annotate whether the ENTIRE tiered call was a cache hit
+              // (true only if the final result was cached, which implies all tiers hit)
+              yield* Effect.annotateCurrentSpan("cache.hit", out.hit);
+              return out.value;
+            });
           return memoizedNext(maybeArg[0]);
         }) as Applier<R, E, Req>;
         return applier;

@@ -38,6 +38,7 @@ const implementations: Array<[
   string,
   EffectMemoizeLike<readonly number[], boolean>
 ]> = [
+  ["cachedFunction", Effect.fn("cachedFunction")(Effect.cachedFunction)],
   ["makeMemoizeTrie", trieAdapter],
   ["makeMemoizeTiered", makeMemoizeTiered],
 ];

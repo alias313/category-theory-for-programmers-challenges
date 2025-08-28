@@ -56,6 +56,7 @@ describe("Effect memoization overheads: hits vs misses and arity scaling", () =>
     string,
     EffectMemoizeLike<readonly number[], number>
   ]> = [
+    ["cachedFunction", Effect.fn("cachedFunction")(Effect.cachedFunction)],
     ["makeMemoizeTrie", makeMemoizeTrie],
     ["makeMemoizeTiered", makeMemoizeTiered],
   ];
