@@ -35,7 +35,7 @@ export function makeMemoizeSingle<A, R, E, Req>(
         // --- Cache Miss ---
         // Run the original effectful function.
         return f(arg).pipe(
-          Effect.tap(() => Effect.annotateCurrentSpan("cache.miss", false)),
+          Effect.tap(() => Effect.annotateCurrentSpan("cache.hit", false)),
           Effect.map((result) => {
             // Update the map with the new result.
             const newMap = new Map(map).set(arg, result);
@@ -142,7 +142,6 @@ export function makeMemoizeTrie<Args extends readonly any[], R, E, Req>(
     // Effect.fn creates the final function for us. The generator body
     // is the implementation of our memoized function.
     return Effect.fn("makememoizeTrie")(function* (...args: Args) {
-      yield* Effect.annotateCurrentSpan("function.arguments", args);
 
       // We use `modifyEffect` for an atomic "get or compute" operation.
       return yield* SynchronizedRef.modifyEffect(cacheRef, (root) => {
