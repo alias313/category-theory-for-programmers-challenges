@@ -1,37 +1,107 @@
-import { Effect, Ref, SynchronizedRef } from "effect";
+import { Effect, SynchronizedRef } from "effect";
 
 /**
- * Creates an Effect that, when executed, produces a memoized version
- * of an effectful unary function `f`.
+ * Creates an Effect that, when executed, produces a concurrent-safe, traced,
+ * and memoized version of an effectful unary function `f`.
  *
- * @param f The effectful function to memoize. `(arg: A) => Effect<Success, Error, Requirements>`
+ * @param f The effectful function to memoize. `(arg: A) => Effect<...>`
+ * @param functionName The name to use for the trace spans created for each call.
  * @returns An Effect that resolves to the new memoized function.
  */
-export function makeMemoizeSingle<A, Success, Error, Requirements>(
-  f: (arg: A) => Effect.Effect<Success, Error, Requirements>
-): Effect.Effect<(arg: A) => Effect.Effect<Success, Error, Requirements>, never, never> {
+export function makeMemoizeSingle<A, R, E, Req>(
+  f: (arg: A) => Effect.Effect<R, E, Req>,
+): Effect.Effect<(arg: A) => Effect.Effect<R, E, Req>, never, never> {
   return Effect.gen(function* () {
-    // 1. The cache is managed by a Ref
-    const cache = yield* Ref.make(new Map<A, Success>());
+    // Use SynchronizedRef for concurrent-safe, atomic updates.
+    const cache = yield* SynchronizedRef.make(new Map<A, R>());
 
-    // 2. Return the new, memoized function
-    return (arg: A): Effect.Effect<Success, Error, Requirements> => {
-      return Effect.gen(function* () {
-        const map = yield* Ref.get(cache);
+    // Effect.fn creates our final traced function.
+    return Effect.fn("makeMemoizeSingle")(function* (arg: A) {
+      // Add the argument to the span for context.
+      yield* Effect.annotateCurrentSpan("function.argument", arg);
+
+      // `modifyEffect` is an atomic "get-or-set". It ensures that if two fibers
+      // call this for the same new `arg` at the same time, `f(arg)` is only run ONCE.
+      const result = yield* SynchronizedRef.modifyEffect(cache, (map) => {
         if (map.has(arg)) {
-          // Cache hit: return the cached value directly, wrapped in an Effect
-          return map.get(arg)!;
+          // --- Cache Hit ---
+          const effect = Effect.succeed(map.get(arg)! as R).pipe(
+            Effect.tap(() => Effect.annotateCurrentSpan("cache.hit", true))
+          );
+          // Return the result and the UNCHANGED map.
+          return effect.pipe(Effect.map((res) => [res, map] as const));
         }
 
-        // Cache miss: run the original effectful function
-        const result = yield* f(arg);
-
-        // Update the cache with the new result
-        yield* Ref.update(cache, (map) => map.set(arg, result));
-
-        return result;
+        // --- Cache Miss ---
+        // Run the original effectful function.
+        return f(arg).pipe(
+          Effect.tap(() => Effect.annotateCurrentSpan("cache.miss", false)),
+          Effect.map((result) => {
+            // Update the map with the new result.
+            const newMap = new Map(map).set(arg, result);
+            // Return the result and the NEW map.
+            return [result, newMap] as const;
+          })
+        );
       });
-    };
+
+      return result;
+    });
+  });
+}
+
+// This is the Applier function from our previous discussions.
+// It's the function that exists at each "tier" of the memoization.
+interface Applier<R, E, Req> {
+  // Call with an argument to get the next tier's Applier.
+  (arg: unknown): Effect.Effect<Applier<R, E, Req>, E, Req>;
+  // Call with no arguments to get the final result.
+  (): Effect.Effect<R, E, Req>;
+}
+
+/**
+ * Creates an Effect that produces a traced, tiered memoized function of unknown arity.
+ *
+ * @param f The multi-argument effectful function to memoize.
+ * @param functionName The base name for the trace spans.
+ */
+export function makeMemoizeTiered<Args extends readonly unknown[], R, E, Req>(
+  f: (...args: Args) => Effect.Effect<R, E, Req>,
+): Effect.Effect<(...args: Args) => Effect.Effect<R, E, Req>, never, never> {
+  return Effect.gen(function* () {
+    // Build a chain of appliers; memoize next-tier and final result per path.
+    const createApplier = (
+      collectedArgs: unknown[]
+    ): Effect.Effect<Applier<R, E, Req>, never, never> =>
+      Effect.gen(function* () {
+        const memoizedNext = yield* makeMemoizeSingle((arg: unknown) =>
+          createApplier([...collectedArgs, arg])
+        );
+        const memoizedResult = yield* makeMemoizeSingle((_: void) =>
+          f(...(collectedArgs as unknown as Args))
+        );
+
+        const applier: Applier<R, E, Req> = ((...maybeArg: [unknown] | []) => {
+          if (maybeArg.length === 0) return memoizedResult(undefined);
+          return memoizedNext(maybeArg[0]);
+        }) as Applier<R, E, Req>;
+        return applier;
+      });
+
+    const rootApplier = yield* createApplier([]);
+
+    const memoized = (
+      ...args: Args
+    ): Effect.Effect<R, E, Req> =>
+      Effect.gen(function* () {
+        let applier = rootApplier;
+        for (const arg of args) {
+          applier = yield* applier(arg);
+        }
+        return yield* applier();
+      });
+
+    return memoized;
   });
 }
 

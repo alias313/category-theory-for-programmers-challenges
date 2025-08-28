@@ -27,23 +27,6 @@ type EffectMemoizeLike<Args extends readonly unknown[], R, E = never, Req = neve
   f: (...args: Args) => Effect.Effect<R, E, Req>
 ) => Effect.Effect<(...args: Args) => Effect.Effect<R, E, Req>, never, never>;
 
-// Adapter: cache by first argument using makeMemoizeSingle, but still compute using all args
-const firstArgAdapter: EffectMemoizeLike<readonly number[], boolean> = (f) =>
-  Effect.gen(function* () {
-    // Cache the continuation by first argument
-    const memo = yield* makeMemoizeSingle<number, (rest: readonly number[]) => Effect.Effect<boolean, never, never>, never, never>(
-      (first: number) => Effect.succeed((rest: readonly number[]) => f(first, ...(rest as number[])))
-    );
-    return (...args: readonly number[]) => {
-      const [first, ...rest] = args as number[];
-      if (first === undefined) return f();
-      return Effect.gen(function* () {
-        const cont = yield* memo(first);
-        return yield* cont(rest);
-      });
-    };
-  });
-
 // Adapter for makeMemoizeTrie to normalize its type parameters
 const trieAdapter: EffectMemoizeLike<readonly number[], boolean> = (f) =>
   makeMemoizeTrie<readonly number[], boolean, never, never>(f);
@@ -53,7 +36,7 @@ const implementations: Array<[
   EffectMemoizeLike<readonly number[], boolean>
 ]> = [
   ["makeMemoizeTrie", trieAdapter],
-  ["makeMemoizeSingle(first-arg)", firstArgAdapter],
+  ["makeMemoizeTiered", trieAdapter],
 ];
 
 describe.each(implementations)("%s timing behavior (multi-arg)", (name, makeMemoizeImpl) => {
