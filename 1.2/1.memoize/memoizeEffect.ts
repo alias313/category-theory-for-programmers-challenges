@@ -169,7 +169,7 @@ export function makeMemoizeTrie<Args extends readonly any[], R, E, Req>(
 
     // Effect.fn creates the final function for us. The generator body
     // is the implementation of our memoized function.
-    return Effect.fn("makememoizeTrie")(function* (...args: Args) {
+    return Effect.fn("makemeMoizeTrie")(function* (...args: Args) {
 
       yield* Effect.annotateCurrentSpan("function.args", args);
 
