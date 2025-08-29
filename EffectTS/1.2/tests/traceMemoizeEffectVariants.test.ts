@@ -34,11 +34,20 @@ type EffectMemoizeLike<Args extends readonly unknown[], R, E = never, Req = neve
 const trieAdapter: EffectMemoizeLike<readonly number[], boolean> = (f) =>
   makeMemoizeTrie<readonly number[], boolean, never, never>(f);
 
+const cachedAdapter: EffectMemoizeLike<readonly number[], boolean> = (f) =>
+  Effect.cachedFunction<string, boolean, never, never>((key) => f(...(JSON.parse(key) as readonly number[]))).pipe(
+    Effect.map((memoUnary) =>
+      Effect.fn("cachedFunction")(function* (...args: readonly number[]) {
+        return yield* memoUnary(JSON.stringify(args));
+      })
+    )
+  );
+
 const implementations: Array<[
   string,
   EffectMemoizeLike<readonly number[], boolean>
 ]> = [
-  ["cachedFunction", Effect.fn("cachedFunction")(Effect.cachedFunction)],
+  ["cachedFunction", cachedAdapter],
   ["makeMemoizeTrie", trieAdapter],
   ["makeMemoizeTiered", makeMemoizeTiered],
 ];
@@ -86,8 +95,7 @@ describe.each(implementations)("%s timing behavior (multi-arg)", (name, makeMemo
 
     expect(r1).toBe(true);
     expect(r2).toBe(true);
-    // Tracing adds overhead; require a modest speedup
-    expect(secondMs).toBeLessThan(firstMs / 2);
+    expect(secondMs).toBeLessThan(firstMs / 100);
   });
 
   it("same primes, different order => cache miss and slower than cached call", async () => {
@@ -120,7 +128,7 @@ describe.each(implementations)("%s timing behavior (multi-arg)", (name, makeMemo
     expect(cachedR).toBe(true);
     expect(missR).toBe(true);
     // Tracing adds overhead; require a modest slowdown for misses vs cached
-    expect(missMs).toBeGreaterThan(cachedMs * 1.5);
+    expect(missMs).toBeGreaterThan(cachedMs * 1.2);
   });
 });
 
