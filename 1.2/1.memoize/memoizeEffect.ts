@@ -25,7 +25,7 @@ export function makeMemoizeSingle<A, R, E, Req>(
       const result = yield* SynchronizedRef.modifyEffect(cache, (map) => {
         if (map.has(arg)) {
           // --- Cache Hit ---
-          const effect = Effect.succeed(map.get(arg)! as R).pipe(
+          const effect = Effect.succeed(map.get(arg)!).pipe(
             Effect.tap(() => Effect.annotateCurrentSpan("cache.hit", true))
           );
           // Return the result and the UNCHANGED map.

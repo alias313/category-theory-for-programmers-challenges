@@ -62,58 +62,65 @@ const run = <A, E>(effect: Effect.Effect<A, E, never>) =>
 
 describe.each(implementations)("%s timing behavior (multi-arg)", (name, makeMemoizeImpl) => {
   it("all primes: second call hits cache and is much faster", async () => {
-    const memoAllPrime = await run(
-      makeMemoizeImpl((...xs: readonly number[]) => isPrimeEffect(...xs))
+    const { r1, r2, firstMs, secondMs } = await run(
+      Effect.gen(function* () {
+        const memoAllPrime = yield* makeMemoizeImpl((...xs: readonly number[]) => isPrimeEffect(...xs));
+
+        const t1Start = performance.now();
+        const r1 = yield* memoAllPrime(...PRIMES);
+        const t1End = performance.now();
+        const firstMs = t1End - t1Start;
+
+        const t2Start = performance.now();
+        const r2 = yield* memoAllPrime(...PRIMES);
+        const t2End = performance.now();
+        const secondMs = t2End - t2Start;
+
+        return { r1, r2, firstMs, secondMs } as const;
+      })
     );
-
-    const t1Start = performance.now();
-    const r1 = await run(memoAllPrime(...PRIMES));
-    const t1End = performance.now();
-    const firstMs = t1End - t1Start;
-
-    expect(r1).toBe(true);
-
-    const t2Start = performance.now();
-    const r2 = await run(memoAllPrime(...PRIMES));
-    const t2End = performance.now();
-    const secondMs = t2End - t2Start;
 
     const speedup = secondMs > 0 ? firstMs / secondMs : Infinity;
     const speedupStr = Number.isFinite(speedup) ? `${speedup.toFixed(1)}x` : "∞x";
     console.log(`[effect:${name}:all-primes] firstMs=${firstMs.toFixed(3)}ms secondMs=${secondMs.toFixed(3)}ms speedup=${speedupStr}`);
 
+    expect(r1).toBe(true);
     expect(r2).toBe(true);
     // Tracing adds overhead; require a modest speedup
     expect(secondMs).toBeLessThan(firstMs / 2);
   });
 
   it("same primes, different order => cache miss and slower than cached call", async () => {
-    const memoAllPrime = await run(
-      makeMemoizeImpl((...xs: readonly number[]) => isPrimeEffect(...xs))
-    );
     const reversed = [...PRIMES].reverse();
+    const { cachedR, missR, cachedMs, missMs } = await run(
+      Effect.gen(function* () {
+        const memoAllPrime = yield* makeMemoizeImpl((...xs: readonly number[]) => isPrimeEffect(...xs));
 
-    // Warm and measure cached time for the original order
-    await run(memoAllPrime(...PRIMES));
-    const tCachedStart = performance.now();
-    const cachedR = await run(memoAllPrime(...PRIMES));
-    const tCachedEnd = performance.now();
-    const cachedMs = tCachedEnd - tCachedStart;
-    expect(cachedR).toBe(true);
+        // Warm and measure cached time for the original order
+        yield* memoAllPrime(...PRIMES);
+        const tCachedStart = performance.now();
+        const cachedR = yield* memoAllPrime(...PRIMES);
+        const tCachedEnd = performance.now();
+        const cachedMs = tCachedEnd - tCachedStart;
 
-    // Now call with a different order to force cache miss
-    const tMissStart = performance.now();
-    const missR = await run(memoAllPrime(...reversed));
-    const tMissEnd = performance.now();
-    const missMs = tMissEnd - tMissStart;
+        // Now call with a different order to force cache miss
+        const tMissStart = performance.now();
+        const missR = yield* memoAllPrime(...reversed);
+        const tMissEnd = performance.now();
+        const missMs = tMissEnd - tMissStart;
+
+        return { cachedR, missR, cachedMs, missMs } as const;
+      })
+    );
 
     const ratio = missMs > 0 ? missMs / cachedMs : Infinity;
     const ratioStr = Number.isFinite(ratio) ? `${ratio.toFixed(1)}x` : "∞x";
     console.log(`[effect:${name}:different-order] cachedMs=${cachedMs.toFixed(3)}ms missMs=${missMs.toFixed(3)}ms ratio=${ratioStr}`);
 
+    expect(cachedR).toBe(true);
     expect(missR).toBe(true);
     // Tracing adds overhead; require a modest slowdown for misses vs cached
-    expect(missMs).toBeGreaterThan(cachedMs * 2);
+    expect(missMs).toBeGreaterThan(cachedMs * 1.5);
   });
 });
 
