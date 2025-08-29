@@ -11,7 +11,7 @@ export function memoizeSingle<A, R>(f: (arg: A) => R): (arg: A) => R {
 
 // simple memoize that uses serialize to create a key
 // if it accepted objects, some keys like "toString" would be problematic
-type Primitive = string | number | boolean | bigint | symbol | null | undefined
+type Primitive = string | number | boolean | bigint | symbol | null
 
 
 export function memoizeSerialize<Args extends readonly Primitive[], R>(
