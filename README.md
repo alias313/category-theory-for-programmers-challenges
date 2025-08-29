@@ -4,6 +4,7 @@ My solutions for challenges posed in the book.
 Credit to the idea of tiered memoizers to [this article](https://medium.com/@joedski/memoization-of-multi-parametered-functions-in-javascript-8508e89ba545)
 
 Also, memoization in Haskell from [this article](https://functional.computer/blog/memotries)
+- and from [here](https://www.reddit.com/r/haskell/comments/t8k46o/memoization_in_haskell/) and [there](https://stackoverflow.com/questions/3208258/memoization-in-haskell)
 
 ## Tracing and benchmarks
 
