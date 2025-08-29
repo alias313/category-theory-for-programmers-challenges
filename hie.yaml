@@ -1,0 +1,7 @@
+cradle:
+  multi:
+    - path: "Haskell/1.2"
+      config:
+        direct:
+          arguments:
+            - -iHaskell/1.2
